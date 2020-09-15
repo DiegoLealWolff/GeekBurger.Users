@@ -1,6 +1,11 @@
-﻿using Microsoft.AspNetCore.Builder;
+﻿using GeekBurger.Users.Extensions;
+using GeekBurger.Users.Repository;
+using GeekBurger.Users.Services;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Azure.Management.ServiceBus.Fluent;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -17,7 +22,8 @@ namespace GeekBurger.Users
                 
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
+            services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);          
+            
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
@@ -26,12 +32,16 @@ namespace GeekBurger.Users
                     Title = "GeekBurger.Users",
                     Description = "GeekBurguer Users Api"
                 });
-            });
+            });                      
 
-            services.AddCors();            
+            services.AddDbContext<UsersDbContext>(o => o.UseInMemoryDatabase("geekburger-users"));
+
+            services.AddScoped<IUsersRepository, UsersRepository>();
+            services.AddScoped<IServiceBusService, ServiceBusService>();
+            services.AddScoped<IFacialServices, FacialServices>();           
         }
 
-        public void Configure(IApplicationBuilder app, IHostingEnvironment env)
+        public void Configure(IApplicationBuilder app, IHostingEnvironment env, UsersDbContext usersDbContext)
         {
             if (env.IsDevelopment())
             {
@@ -45,6 +55,17 @@ namespace GeekBurger.Users
             app.UseSwaggerUI(c => {
                 c.SwaggerEndpoint(@"/swagger/v1/swagger.json", "GeekBurguerUsers");
             });
+
+            using (var serviceScope = app
+                .ApplicationServices
+                .GetService<IServiceScopeFactory>()
+                .CreateScope())
+            {
+                var context = serviceScope.ServiceProvider.GetRequiredService<UsersDbContext>();
+                context.Database.EnsureCreated();
+            }
+
+            usersDbContext.Seed();            
         }
     }
 }

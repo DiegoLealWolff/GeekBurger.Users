@@ -5,8 +5,12 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using GeekBurger.Users.Contract;
+using GeekBurger.Users.Services;
+using GeekBurger.Users.Model;
+using GeekBurger.Users.Repository;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.ServiceBus;
+using Microsoft.Extensions.Configuration;
 
 namespace GeekBurger.Users.Controllers
 {
@@ -15,20 +19,42 @@ namespace GeekBurger.Users.Controllers
     [ApiController]
     public class UsersController : ControllerBase
     {
-        private IList<User> Users = new List<User>()
+        private IUsersRepository _usersRepository;
+        private IConfiguration _configuration;
+
+        public UsersController(IUsersRepository usersRepository, IConfiguration configuration)
         {
-            new User { Face = "XXXX", UserId = 1 },
-            new User { Face = "YYYY", UserId = 2 },
-            new User { Face = "YYYY", UserId = 3 }
-        };
+            _usersRepository = usersRepository;
+            _configuration = configuration;
+        }
 
         [HttpPost("user")]
-        public IActionResult PostValidadeUser(string face)
+        public async Task<IActionResult> PostValidadeUser(string faceInput)
         {
-            //AQUI PRECISO ACESSAR A API DE RECONHECIMENTO FACIAL   
-            var result = Users.Where(x => x.Face == face).ToList();
+            //01 - VALIDAR USUÁRIO
+            var apiFacial = new FacialServices(_usersRepository);
+            var resultModel = apiFacial.StartValidade(faceInput);
 
-            if (result.Count <= 0)
+            //02 - PUBLICAR UserRetrieved - se tem ou não restrição alimentar
+            var serviceBusService = new ServiceBusService(_configuration);
+            var result = serviceBusService.CreateTopic();
+
+            //var responseModel = new ResponseModel()
+            //{
+            //    //UserId = resultModel.UserId,
+            //    UserId = 2132121,
+            //    Processing = true
+            //};
+
+            var userRetrieved = new UserRetrieved()
+            {
+                AreRestrictionsSet = true,
+                UserId = resultModel.UserId
+            };
+
+            result = await serviceBusService.SendMessagesAsync(userRetrieved);
+
+            if (result == false)
             {
                 return NotFound();
             }
@@ -37,29 +63,20 @@ namespace GeekBurger.Users.Controllers
         }
 
         [HttpPost("foodRestriction")]
-        public async Task<IActionResult> PostPublishFoodRestriction(FoodRestriction foodRestriction)
-        {
-            string QueueConnectionString = "Endpoint=sb://geekburguerdiegowolffservicebus.servicebus.windows.net/;SharedAccessKeyName=ProductPolicy;SharedAccessKey=hyPvBASPC5yAtXSI/UFMNLDWETBJD46jXFrXbhNU880=";
-            string QueuePath = "foodRestriction";
-
-            IQueueClient queueClient = new QueueClient(QueueConnectionString, QueuePath);
-            queueClient.OperationTimeout = TimeSpan.FromSeconds(10);
-
+        public async void PostPublishFoodRestriction(FoodRestriction foodRestriction)
+        {      
             var userRetrieved = new UserRetrieved()
             {
-                AreRestrictionsSet = foodRestriction.Restrictions,
+                AreRestrictionsSet = true,
                 UserId = foodRestriction.UserId
             };
 
-            var messages = new List<Message>();
-            messages.Add(new Message(Encoding.UTF8.GetBytes(userRetrieved.AreRestrictionsSet)));
-            messages.Add(new Message(Encoding.UTF8.GetBytes(userRetrieved.UserId.ToString())));
+            //01 - PUBLICAR UserRetrieved - se tem ou não restrição alimentar
+            var serviceBusService = new ServiceBusService(_configuration);
 
-            var sendTask = queueClient.SendAsync(messages);
+            serviceBusService.CreateTopic();
 
-            await sendTask;
-
-            return StatusCode(200);
+            await serviceBusService.SendMessagesAsync(userRetrieved);
         }
     }
 }
