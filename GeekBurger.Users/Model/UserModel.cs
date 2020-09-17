@@ -17,6 +17,6 @@ namespace GeekBurger.Users.Model
 
         public string Others { get; set; }
 
-        public string AreRestrictionsSet { get; set; }
+        public bool AreRestrictionsSet { get; set; }
     }
 }

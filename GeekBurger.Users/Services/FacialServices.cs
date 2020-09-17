@@ -26,8 +26,8 @@ namespace GeekBurger.Users.Services
 
             _usersRepository = usersRepository;
 
-            _faceServiceClient = new FaceServiceClient(_Configuration["FaceAPIKey"], _Configuration["FaceEndPoint"]);            
-        }   
+            _faceServiceClient = new FaceServiceClient(_Configuration["FaceAPIKey"], _Configuration["FaceEndPoint"]);
+        }
 
         public UserModel StartValidade(string faceInput)
         {
@@ -45,43 +45,44 @@ namespace GeekBurger.Users.Services
                 }
                 else
                 {
-                    sourceImage = string.Format(templateImage, faceInput);   
-                    
-                    var containsAnyFaceOnList = UpsertFaceListAndCheckIfContainsFaceAsync().Result;
+                    //sourceImage = string.Format(templateImage, faceInput);   
 
-                    var face = DetectFaceAsync(sourceImage).Result;
+                    //var containsAnyFaceOnList = UpsertFaceListAndCheckIfContainsFaceAsync().Result;
 
-                    if (face != null)
+                    //var face = DetectFaceAsync(sourceImage).Result;
+
+                    //if (face != null)
+                    //{
+
+                    //    Guid? persistedId = null;
+
+                    //    if (containsAnyFaceOnList)
+                    //    {
+                    //        persistedId = FindSimilarAsync(face.FaceId, faceInput).Result;
+                    //    }
+
+                    //    if (persistedId == null)
+                    //    {
+                    //        var guid = new Guid(faceInput);
+                    //        persistedId = AddFaceAsync(guid, sourceImage).Result;                            
+                    //    }
+
+                    Random randNum = new Random();
+                    var modelUser = new UserModel()
                     {
+                        Face = faceInput,
+                        UserId = randNum.Next(999999999),
+                        AreRestrictionsSet = false
+                    };
 
-                        Guid? persistedId = null;
+                    _usersRepository.Add(modelUser);
 
-                        if (containsAnyFaceOnList)
-                        {
-                            persistedId = FindSimilarAsync(face.FaceId, faceInput).Result;
-                        }
-
-                        if (persistedId == null)
-                        {
-                            var guid = new Guid(faceInput);
-                            persistedId = AddFaceAsync(guid, sourceImage).Result;                            
-                        }
-
-                        var modelUser = new UserModel()
-                        {
-                            Face = faceInput,
-                            UserId = Convert.ToInt32(persistedId.Value),
-                            AreRestrictionsSet = "false"
-                        };
-
-                        _usersRepository.Add(modelUser);
-
-                        return modelUser;
-                    }
-                    else
-                    {
-                        return null;
-                    }
+                    return modelUser;
+                    //}
+                    //else
+                    //{
+                    //    return null;
+                    //}
                 }
             }
             catch (Exception ex)
@@ -138,7 +139,7 @@ namespace GeekBurger.Users.Services
                 using (Stream imageFileStream = File.OpenRead(imageFilePath))
                 {
                     var faces = await _faceServiceClient.DetectAsync(imageFileStream);
-                    
+
                     return faces.FirstOrDefault();
                 }
             }

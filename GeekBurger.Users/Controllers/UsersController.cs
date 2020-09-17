@@ -30,21 +30,12 @@ namespace GeekBurger.Users.Controllers
 
         [HttpPost("user")]
         public async Task<IActionResult> PostValidadeUser(string faceInput)
-        {
-            //01 - VALIDAR USUÁRIO
+        {            
             var apiFacial = new FacialServices(_usersRepository);
             var resultModel = apiFacial.StartValidade(faceInput);
-
-            //02 - PUBLICAR UserRetrieved - se tem ou não restrição alimentar
+                        
             var serviceBusService = new ServiceBusService(_configuration);
-            var result = serviceBusService.CreateTopic();
-
-            //var responseModel = new ResponseModel()
-            //{
-            //    //UserId = resultModel.UserId,
-            //    UserId = 2132121,
-            //    Processing = true
-            //};
+            var result = serviceBusService.CreateTopic();            
 
             var userRetrieved = new UserRetrieved()
             {
@@ -70,12 +61,9 @@ namespace GeekBurger.Users.Controllers
                 AreRestrictionsSet = true,
                 UserId = foodRestriction.UserId
             };
-
-            //01 - PUBLICAR UserRetrieved - se tem ou não restrição alimentar
+      
             var serviceBusService = new ServiceBusService(_configuration);
-
             serviceBusService.CreateTopic();
-
             await serviceBusService.SendMessagesAsync(userRetrieved);
         }
     }
